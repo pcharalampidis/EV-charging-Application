@@ -386,19 +386,21 @@ function renderBookings(bookings) {
     const bookingDate = booking.booking_date || booking.bookingDate;
     const start = booking.start_time || booking.startTime;
     const end = booking.end_time || booking.endTime;
+    const stationName = booking.station_name || booking.stationName || `Station ${stationId}`;
+    const connectorType = booking.connector_type || booking.connectorType || `Connector ${connectorId}`;
 
     return `
       <tr>
         <td>${id}</td>
         <td>${escapeHtml(booking.username || "")}</td>
-        <td>${stationId}</td>
-        <td>${connectorId}</td>
+        <td>${escapeHtml(stationName)}</td>
+        <td>${escapeHtml(connectorType)}</td>
         <td>${escapeHtml(bookingDate)}</td>
         <td>${escapeHtml(start)}</td>
         <td>${escapeHtml(end)}</td>
         <td>${escapeHtml(booking.status || "")}</td>
         <td>
-          <button class="small secondary" onclick="editBooking(${id}, ${connectorId}, '${escapeAttr(bookingDate)}', '${escapeAttr(start)}', '${escapeAttr(end)}')">
+          <button class="small secondary" onclick="editBooking(${id}, ${connectorId}, '${escapeAttr(bookingDate)}', '${escapeAttr(start)}', '${escapeAttr(end)}', '${escapeAttr(stationName)}', '${escapeAttr(connectorType)}')">
             Modify
           </button>
           <button class="small danger" onclick="cancelBooking(${id})">
@@ -410,33 +412,116 @@ function renderBookings(bookings) {
   }).join("");
 }
 
-async function editBooking(id, connectorId, date, start, end) {
-  const newConnectorId = prompt("Connector ID:", connectorId);
-  const newDate = prompt("Booking date YYYY-MM-DD:", date);
-  const newStart = prompt("Start time HH:MM:", start.substring(0, 5));
-  const newEnd = prompt("End time HH:MM:", end.substring(0, 5));
+/* ─── Modify Booking Modal ─── */
 
-  if (!newConnectorId || !newDate || !newStart || !newEnd) {
+const modState = { bookingId: null, selectedSlot: null };
+
+function editBooking(id, connectorId, date, start, end, stationName, connectorType) {
+  modState.bookingId = id;
+  modState.selectedSlot = null;
+
+  $("modBookingId").textContent = id;
+  $("modCurrentInfo").textContent = `${stationName} / ${connectorType} — ${date} ${start.substring(0,5)}–${end.substring(0,5)}`;
+
+  // Populate station dropdown from loaded stations
+  const stationSelect = $("modStation");
+  stationSelect.innerHTML = '<option value="">-- Select station --</option>' +
+    state.stations.map(s => `<option value="${getStationId(s)}">${escapeHtml(getStationName(s))} - ${escapeHtml(s.address || "")}</option>`).join("");
+
+  $("modConnector").innerHTML = '<option value="">-- Select connector --</option>';
+  $("modDate").value = date;
+  $("modDate").min = todayIso();
+  $("modSlots").innerHTML = "";
+  setMessage("modMessage", "");
+
+  $("modifyOverlay").classList.remove("hidden");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  $("modCloseButton").addEventListener("click", closeModifyModal);
+  $("modSaveButton").addEventListener("click", saveModifiedBooking);
+  $("modStation").addEventListener("change", onModStationChange);
+  $("modConnector").addEventListener("change", onModConnectorOrDateChange);
+  $("modDate").addEventListener("change", onModConnectorOrDateChange);
+});
+
+function closeModifyModal() {
+  $("modifyOverlay").classList.add("hidden");
+}
+
+async function onModStationChange() {
+  const stationId = Number($("modStation").value);
+  $("modConnector").innerHTML = '<option value="">-- Select connector --</option>';
+  $("modSlots").innerHTML = "";
+  modState.selectedSlot = null;
+
+  if (!stationId) return;
+
+  try {
+    const details = await api(`/stations/${stationId}`);
+    const connectors = details.connectors || [];
+    $("modConnector").innerHTML = '<option value="">-- Select connector --</option>' +
+      connectors.map(c => `<option value="${getConnectorId(c)}">${escapeHtml(getConnectorType(c))} (Connector #${getConnectorId(c)})</option>`).join("");
+  } catch (e) {
+    setMessage("modMessage", e.message, true);
+  }
+}
+
+async function onModConnectorOrDateChange() {
+  const connectorId = Number($("modConnector").value);
+  const date = $("modDate").value;
+  $("modSlots").innerHTML = "";
+  modState.selectedSlot = null;
+
+  if (!connectorId || !date) return;
+
+  try {
+    const slots = await api(`/connectors/${connectorId}/availability?date=${encodeURIComponent(date)}`);
+    if (!slots || slots.length === 0) {
+      $("modSlots").innerHTML = '<p class="muted">No available slots.</p>';
+      return;
+    }
+    $("modSlots").innerHTML = slots.map(slot => {
+      const s = slot.start_time || slot.startTime;
+      const e = slot.end_time || slot.endTime;
+      return `<button type="button" class="slot" onclick="pickModSlot(this,'${escapeAttr(s)}','${escapeAttr(e)}')">${escapeHtml(s)} - ${escapeHtml(e)}</button>`;
+    }).join("");
+  } catch (e) {
+    $("modSlots").innerHTML = `<p class="message error">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function pickModSlot(btn, start, end) {
+  $("modSlots").querySelectorAll(".slot").forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+  modState.selectedSlot = { start, end };
+}
+
+async function saveModifiedBooking() {
+  const connectorId = Number($("modConnector").value);
+  const date = $("modDate").value;
+
+  if (!connectorId || !date || !modState.selectedSlot) {
+    setMessage("modMessage", "Select station, connector, date, and a time slot.", true);
     return;
   }
 
   try {
-    await api(`/bookings/${id}`, {
+    await api(`/bookings/${modState.bookingId}`, {
       method: "PUT",
       body: {
-        connector_id: Number(newConnectorId),
-        booking_date: newDate,
-        start_time: newStart,
-        end_time: newEnd
+        connector_id: connectorId,
+        booking_date: date,
+        start_time: modState.selectedSlot.start.substring(0, 5),
+        end_time: modState.selectedSlot.end.substring(0, 5)
       }
     });
 
+    closeModifyModal();
     await loadBookings();
-    if (state.selectedConnector) {
-      await loadAvailability();
-    }
-  } catch (error) {
-    alert(error.message);
+    if (state.selectedConnector) await loadAvailability();
+  } catch (e) {
+    setMessage("modMessage", e.message, true);
   }
 }
 

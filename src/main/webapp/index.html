@@ -159,6 +159,36 @@
   </section>
 </main>
 
+<div id="modifyOverlay" class="modify-overlay hidden">
+  <div class="modify-card">
+    <h2>Modify Booking</h2>
+
+    <div class="modify-current">
+      <p><strong>Booking #<span id="modBookingId"></span></strong></p>
+      <p class="muted">Current: <span id="modCurrentInfo"></span></p>
+    </div>
+
+    <label for="modStation">Station</label>
+    <select id="modStation"><option value="">-- Select station --</option></select>
+
+    <label for="modConnector">Connector</label>
+    <select id="modConnector"><option value="">-- Select connector --</option></select>
+
+    <label for="modDate">Date</label>
+    <input id="modDate" type="date" />
+
+    <p class="muted" id="modSlotsLabel">Available slots:</p>
+    <div id="modSlots" class="slots"></div>
+
+    <p id="modMessage" class="message"></p>
+
+    <div class="button-row">
+      <button id="modSaveButton">Save changes</button>
+      <button id="modCloseButton" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   <p>CCS3341 Cloud Computing Coursework - EV Charging Booking System</p>
 </footer>

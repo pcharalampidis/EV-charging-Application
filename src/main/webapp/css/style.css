@@ -245,6 +245,53 @@ footer {
   padding: 20px;
 }
 
+.modify-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modify-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.2);
+}
+
+.modify-card select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.modify-current {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.modify-card .slots {
+  min-height: 36px;
+}
+
+.modify-card .slot.selected {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
 @media (max-width: 900px) {
   .topbar,
   .section-head {
